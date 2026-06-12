@@ -50,6 +50,16 @@ io.on('connection', (socket) => {
   });
 });
 
+// Keep server awake on Render free tier
+const https = require('https');
+setInterval(() => {
+  https.get('https://vybe-backend-vt91.onrender.com', (res) => {
+    console.log('Server kept alive:', res.statusCode);
+  }).on('error', (err) => {
+    console.log('Keep alive error:', err.message);
+  });
+}, 14 * 60 * 1000); // Every 14 minutes
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
