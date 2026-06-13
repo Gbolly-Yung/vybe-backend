@@ -74,9 +74,9 @@ const login = async (req, res) => {
 
     // Find user
     const result = await db.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
+  'SELECT * FROM users WHERE email = $1 OR username = $1',
+  [email]
+);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ message: 'Invalid email or password' });
