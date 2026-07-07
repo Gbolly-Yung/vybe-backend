@@ -151,6 +151,77 @@ app.post('/api/watermark', async (req, res) => {
   }
 });
 
+// Watermark endpoint
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+app.post('/api/watermark', async (req, res) => {
+  const { media_url, media_type, username } = req.body;
+  if (!media_url) return res.status(400).json({ error: 'media_url required' });
+
+  const tmpDir = os.tmpdir();
+  const ext = media_type === 'video' ? 'mp4' : 'jpg';
+  const inputPath = path.join(tmpDir, `havvit_input_${Date.now()}.${ext}`);
+  const outputPath = path.join(tmpDir, `havvit_output_${Date.now()}.${ext}`);
+
+  try {
+    const response = await axios({ url: media_url, method: 'GET', responseType: 'stream' });
+    const writer = fs.createWriteStream(inputPath);
+    response.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    const watermarkText = `Havvit  @${username || 'havvit'}`;
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .videoFilters([{
+          filter: 'drawtext',
+          options: {
+            text: watermarkText,
+            fontsize: media_type === 'video' ? 28 : 24,
+            fontcolor: 'white',
+            alpha: 0.85,
+            x: '20',
+            y: 'h-th-30',
+            shadowcolor: 'black',
+            shadowx: 2,
+            shadowy: 2,
+            box: 1,
+            boxcolor: 'black@0.4',
+            boxborderw: 8,
+          },
+        }])
+        .outputOptions(media_type === 'video' ? ['-codec:a copy'] : [])
+        .save(outputPath)
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    res.setHeader('Content-Type', media_type === 'video' ? 'video/mp4' : 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="havvit.${ext}"`);
+    const stream = fs.createReadStream(outputPath);
+    stream.pipe(res);
+    stream.on('end', () => {
+      fs.unlink(inputPath, () => {});
+      fs.unlink(outputPath, () => {});
+    });
+  } catch (e) {
+    console.log('Watermark error:', e.message);
+    fs.unlink(inputPath, () => {});
+    fs.unlink(outputPath, () => {});
+    res.status(500).json({ error: 'Watermark failed', details: e.message });
+  }
+});
+
 // Test route
 app.get('/', (req, res) => {
   res.json({
