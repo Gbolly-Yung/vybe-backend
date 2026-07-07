@@ -49,6 +49,7 @@ app.use(globalLimiter);
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
 
+app.post('/api/watermark', async (req, res) => {
   const { media_url, media_type, username } = req.body;
   if (!media_url) return res.status(400).json({ error: 'media_url required' });
 
